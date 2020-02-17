@@ -333,11 +333,18 @@ class DurativeAction(Operator):
         return super(DurativeAction, self).effects_and_conditions() + conditions
 
 
+class Predicate():
+    def __init__(self, name, variable_list):
+        self.predicate_name = name
+        self.variable_list = variable_list
+
+
 class DomainListener(pddlListener):
     def __init__(self):
         self.typesdef = False
         self.objects = {}
         self.operators = {}
+        self.predicates = []
         self.scopes = []
 
     def enterActionDef(self, ctx):
@@ -358,6 +365,18 @@ class DomainListener(pddlListener):
 
     def enterPredicatesDef(self, ctx):
         self.scopes.append(Operator(None))
+	# hacking
+        for predicateCtx in ctx.atomicFormulaSkeleton():
+            variable_lst = {}
+            predicate_name = predicateCtx.predicate().getText()
+            typed_variable_lsts = predicateCtx.getTypedRuleContexts(pddlParser.TypedVariableListContext)
+            for typed_variable_ctx in typed_variable_lsts:
+                for single_typed_var_ctx in typed_variable_ctx.getTypedRuleContexts(pddlParser.SingleTypeVarListContext):
+                    single_type = single_typed_var_ctx.getTypedRuleContext(pddlParser.R_typeContext, 0).getText()
+                    single_key = single_typed_var_ctx.getChild(0).getText()
+                    variable_lst[single_key] = single_type
+            self.predicates.append(Predicate(predicate_name, variable_lst))
+
 
     def exitPredicatesDef(self, ctx):
         dummyop = self.scopes.pop()
@@ -656,6 +675,9 @@ class DomainProblem():
         # a dict where keys are var names and values
         # a list of possible symbols.
         self.vargroundspace = {}
+
+    def predicates(self):
+        return self.domain.predicates
 
     def operators(self):
         """Returns an iterator of the names of the actions defined in
